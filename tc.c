@@ -32,6 +32,8 @@
 
 #define min(x, y) ((x) < (y) ? (x) : (y))
 
+int server_fd = -1;
+
 typedef struct
 {
 	int sysrq_fd;
@@ -73,15 +75,27 @@ int sockprint(int fd, char *format, ...)
 
 int readchar_low(int fd)
 {
-	for(;;)
-	{
-		unsigned char key;
-		int rc = read(fd, (char *)&key, 1);
+	struct pollfd fds[2] = { { fd, POLLIN, 0 }, { server_fd, POLLIN, 0 } };
 
-		if (rc <= 0)
+	for(;;) {
+		int rc = poll(fds, 2, -1);
+		if (rc <= 0) // rc of 0 should not happen (timeout = -1!)
 			break;
 
-		return key;
+		// a new connection will terminate existing connection
+		// via an error state
+		if (fds[1].revents)
+			return -1;
+
+		if (fds[0].revents) {
+			unsigned char key;
+			int rc = read(fd, (char *)&key, 1);
+
+			if (rc <= 0)
+				break;
+
+			return key;
+		}
 	}
 
 	return -1;
@@ -162,33 +176,29 @@ char *get_string(int fd)
 
 int ec_help(int fd)
 {
-	int rc = 0;
-
-	rc |= sockprint(fd, "tcpconsole v " VERSION ", (C) 2009-2016 by folkert@vanheusden.com\r\n");
-	rc |= sockprint(fd, "h: this help\r\n");
-	rc |= sockprint(fd, "d: dump virtual console 0\r\n");
-	rc |= sockprint(fd, "j: 'kill -9' for a given pid\r\n");
-	rc |= sockprint(fd, "k: 'killall -9' for a given name\r\n");
-	rc |= sockprint(fd, "l: dump dmesg\r\n");
-	rc |= sockprint(fd, "m: dump dmesg & clear dmesg buffer\r\n");
-	rc |= sockprint(fd, "p: process list\r\n");
-	rc |= sockprint(fd, "i: show system (e.g. load)\r\n");
-	rc |= sockprint(fd, "1-8: set dmesg loglevel\r\n");
-	rc |= sockprint(fd, "q: log off\r\n");
-	rc |= sockprint(fd, "\r\nSysreq:\r\n");
-	rc |= sockprint(fd, "B - boot\r\n");
-	rc |= sockprint(fd, "C - kexec\r\n");
-	rc |= sockprint(fd, "D - list all locks\r\n");
-	rc |= sockprint(fd, "E - SIGTERM to all but init, I - SIGKILL to all but init\r\n");
-	rc |= sockprint(fd, "F - call oom_kill\r\n");
-	rc |= sockprint(fd, "L - backtrace\r\n");
-	rc |= sockprint(fd, "M - memory info dump, P - register/flags dump\r\n");
-	rc |= sockprint(fd, "O - switch off\r\n");
-	rc |= sockprint(fd, "Q - list hrtimers\r\n");
-	rc |= sockprint(fd, "S - SYNC, U - umount\r\n");
-	rc |= sockprint(fd, "T - tasklist dump, W - unint. tasks dump\r\n");
-
-	return rc;
+	return sockprint(fd, "tcpconsole v " VERSION ", (C) 2009-2016 by folkert@vanheusden.com\r\n"
+		"h: this help\r\n"
+		"d: dump virtual console 0\r\n"
+		"j: 'kill -9' for a given pid\r\n"
+		"k: 'killall -9' for a given name\r\n"
+		"l: dump dmesg\r\n"
+		"m: dump dmesg & clear dmesg buffer\r\n"
+		"p: process list\r\n"
+		"i: show system (e.g. load)\r\n"
+		"1-8: set dmesg loglevel\r\n"
+		"q: log off\r\n"
+		"\r\nSysreq:\r\n"
+		"B - boot\r\n"
+		"C - kexec\r\n"
+		"D - list all locks\r\n"
+		"E - SIGTERM to all but init, I - SIGKILL to all but init\r\n"
+		"F - call oom_kill\r\n"
+		"L - backtrace\r\n"
+		"M - memory info dump, P - register/flags dump\r\n"
+		"O - switch off\r\n"
+		"Q - list hrtimers\r\n"
+		"S - SYNC, U - umount\r\n"
+		"T - tasklist dump, W - unint. tasks dump\r\n");
 }
 
 int sockerror(int fd, char *what)
@@ -221,11 +231,15 @@ int dump_virtual_console(int fd_out, int fd_in)
 
 			if (ca[0] != ' ')
 			{
-				for(loop=0; loop<nspaces; loop++)
-					sockprint(fd_out, " ");
+				for(loop=0; loop<nspaces; loop++) {
+					if (sockprint(fd_out, " ") == -1)
+						return -1;
+				}
+
 				nspaces = 0;
 
-				sockprint(fd_out, "%c", ca[0]);
+				if (sockprint(fd_out, "%c", ca[0]) == -1)
+					return -1;
 			}
 			else
 			{
@@ -312,6 +326,9 @@ int dump_ps(int fd)
 			{
 				fclose(fh);
 
+				if (rc)
+					break;
+
 				snprintf(path, sizeof(path), "/proc/%s/cmdline", de -> d_name);
 				fh = fopen(path, "r");
 			}
@@ -342,7 +359,8 @@ int dump_ps(int fd)
 				rc |= sockprint(fd, "Error opening %s\r\n", path);
 			}
 
-			if (rc) break;
+			if (rc)
+				break;
 		}
 	}
 
@@ -397,37 +415,39 @@ int kill_one_proc(int client_fd)
 	pid = atoi(entered);
 	rc = sockprint(client_fd, "Killing pid %d\r\n", pid);
 
-	if (kill(pid, SIGTERM) == -1)
-		rc |= sockerror(client_fd, "kill(-9)");
+	if (kill(pid, SIGKILL) == -1)
+		rc |= sockerror(client_fd, "kill(SIGKILL)");
 
 	return rc;
 }
 
 int kill_procs(int client_fd)
 {
-	int nprocs = 0;
+	int nprocs = 0, rc = 0;
 	struct dirent *de;
 	DIR *dirp = opendir("/proc");
 	char *entered;
+	FILE *fh = NULL;
 
-	if (sockprint(client_fd, "Process name (q to abort): ") == -1)
-		return -1;
+	rc = sockprint(client_fd, "Process name (q to abort): ");
+	if (rc)
+		goto abort_label;
 
 	entered = get_string(client_fd);
 	if (!entered)
-		return -1;
+		goto abort_label;
 
 	if (strcmp(entered, "q") == 0)
-		return 0;
+		goto abort_label;
 
-	if (sockprint(client_fd, "\r\nKilling proces %s\r\n", entered) == -1)
-		return -1;
+	rc = sockprint(client_fd, "\r\nKilling proces %s\r\n", entered);
+	if (rc)
+		goto abort_label;
 
 	while((de = readdir(dirp)) != NULL)
 	{
 		if (isdigit(de -> d_name[0]))
 		{
-			FILE *fh;
 			static char path[128];
 
 			snprintf(path, sizeof(path), "/proc/%s/stat", de -> d_name);
@@ -444,22 +464,35 @@ int kill_procs(int client_fd)
 				if (strcmp(pdummy, entered) == 0)
 				{
 					pid_t pid = atoi(de -> d_name);
-					if (sockprint(client_fd, "Killing pid %d\r\n", pid) == -1)
-						break;
 
-					if (kill(pid, SIGTERM) == -1)
+					rc = sockprint(client_fd, "Killing pid %d\r\n", pid);
+					if (rc)
+						goto abort_label;
+
+					if (kill(pid, SIGKILL) == -1)
 					{
-						if (sockerror(client_fd, "kill(-9)") == -1)
-							break;
+						rc = sockerror(client_fd, "kill(SIGKILL)");
+						if (rc)
+							goto abort_label;
 					}
 
 					nprocs++;
 				}
 
 				fclose(fh);
+				fh = NULL;
+			}
+			else {
+				rc = sockprint(client_fd, "%s terminated at itself", de -> d_name);
+				if (rc)
+					goto abort_label;
 			}
 		}
 	}
+
+abort_label:
+	if (fh)
+		fclose(fh);
 
 	closedir(dirp);
 
@@ -595,9 +628,8 @@ int verify_password(int client_fd, char *password)
 
 void listen_on_socket(int port, parameters_t *pars, char *password)
 {
-	int server_fd;
 	struct sockaddr_in server_addr;
-	int on = 1, optlen, sec60 = 60;
+	int on = 1, optlen = sizeof(on), sec60 = 60;
 
 	memset(&server_addr, 0x00, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
@@ -627,9 +659,7 @@ void listen_on_socket(int port, parameters_t *pars, char *password)
 
 	for(;;)
 	{
-		struct sockaddr_in client_addr;
-		socklen_t client_addr_size = sizeof(client_addr);
-		int client_fd = accept(server_fd, (struct sockaddr *)&client_addr, &client_addr_size);
+		int client_fd = accept(server_fd, NULL, NULL);
 		if (client_fd == -1)
 		{
 			if (errno == EINTR)
@@ -639,8 +669,7 @@ void listen_on_socket(int port, parameters_t *pars, char *password)
 			continue;
 		}
 
-		optlen = sizeof(on);
-		if(setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &on, optlen) == -1)
+		if (setsockopt(client_fd, SOL_SOCKET, SO_KEEPALIVE, &on, optlen) == -1)
 		{
 			if (sockerror(client_fd, "setsockopt(SO_KEEPALIVE)") == -1)
 			{

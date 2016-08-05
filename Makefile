@@ -1,4 +1,4 @@
-VERSION=0.6
+VERSION=0.7
 
 # www.vanheusden.com
 
@@ -29,6 +29,6 @@ package: clean
 	# source package
 	rm -rf tcpconsole-$(VERSION)*
 	mkdir tcpconsole-$(VERSION)
-	cp *.c *.h Makefile* readme.txt *service tcpconsole-$(VERSION)
+	cp *.c *.h Makefile* README.md *service tcpconsole-$(VERSION)
 	tar cf - tcpconsole-$(VERSION) | gzip -9 > tcpconsole-$(VERSION).tgz
 	rm -rf tcpconsole-$(VERSION)
