@@ -14,10 +14,10 @@ tcpconsole: $(OBJS)
 	$(CC) -Wall -W $(OBJS) $(LDFLAGS) -o tcpconsole
 
 install: tcpconsole
-	cp tcpconsole /usr/local/sbin
-	cp tcpconsole.service /etc/systemd/system
-	systemctl enable tcpconsole
-	systemctl start tcpconsole
+	mkdir -p $(DESTDIR)$(PREFIX)/sbin
+	cp tcpconsole $(DESTDIR)$(PREFIX)/sbin
+	mkdir -p $(DESTDIR)$(PREFIX)/etc/systemd/system
+	cp tcpconsole.service $(DESTDIR)$(PREFIX)/etc/systemd/system
 
 uninstall:
 	rm /usr/local/sbin/tcpconsole /etc/systemd/system/tcpconsole.service

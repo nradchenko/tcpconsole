@@ -1,0 +1,13 @@
+Source: tcpconsole
+Maintainer: Folkert van Heusden <mail@vanheusden.com>
+Section: utils
+Priority: optional
+Standards-Version: 3.9.5
+Build-Depends: debhelper
+Homepage: http://www.vanheusden.com/tcpconsole/
+
+Package: tcpconsole
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: An emergency console for Linux systems. Allows
+ you to e.g. reboot the system.

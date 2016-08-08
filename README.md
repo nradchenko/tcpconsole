@@ -2,14 +2,16 @@ Installation:
 ------------
 make install
 
-sysvinit users need to do
+sysvinit users need to do:
 	Add to /etc/inittab:
 	tc:12345:respawn:/usr/local/sbin/tcpconsole
 
 	Send HUP to init:
 	killall -HUP init
 
-Systemd installation is automatic.
+Systemd users need to do:
+        systemctl enable tcpconsole
+        systemctl start tcpconsole
 
 This program only works on Linux.
 

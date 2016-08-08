@@ -1,0 +1,5 @@
+#! /bin/sh
+
+systemctl enable tcpconsole
+
+systemctl start tcpconsole
