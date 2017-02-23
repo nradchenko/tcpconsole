@@ -208,7 +208,7 @@ int sockerror(int fd, char *what)
 
 int dump_virtual_console(int fd_out, int fd_in)
 {
-	struct{ char lines, cols, x, y; } scrn;
+	struct{ unsigned char lines, cols, x, y; } scrn;
 	int x, y;
 
 	if (lseek(fd_in, 0, SEEK_SET) == -1)
