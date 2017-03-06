@@ -20,7 +20,7 @@ install: tcpconsole
 	cp tcpconsole.service $(DESTDIR)$(PREFIX)/etc/systemd/system
 
 uninstall:
-	rm /usr/local/sbin/tcpconsole /etc/systemd/system/tcpconsole.service
+	rm /sbin/tcpconsole /etc/systemd/system/tcpconsole.service
 
 clean:
 	rm -f $(OBJS) core tcpconsole
