@@ -1,5 +1,5 @@
-tcpconsole (0.8-1) unstable; urgency=low
+tcpconsole (0.9-1) unstable; urgency=low
 
   * New upstream release.
 
- -- Folkert van Heusden <mail@vanheusden.com>  Sun, 23 Feb 2014 11:30:00 +0100
+ -- Folkert van Heusden <mail@vanheusden.com>  Mon, 06 Mar 2017 11:30:00 +0100

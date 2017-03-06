@@ -176,7 +176,7 @@ char *get_string(int fd)
 
 int ec_help(int fd)
 {
-	return sockprint(fd, "tcpconsole v " VERSION ", (C) 2009-2016 by folkert@vanheusden.com\r\n"
+	return sockprint(fd, "tcpconsole v " VERSION ", (C) 2009-2017 by folkert@vanheusden.com\r\n"
 		"h: this help\r\n"
 		"d: dump virtual console 0\r\n"
 		"j: 'kill -9' for a given pid\r\n"
