@@ -6,7 +6,7 @@ Type=simple
 User=root
 Group=root
 Restart=always
-ExecStart=/usr/local/sbin/tcpconsole
+ExecStart=/sbin/tcpconsole
 TimeoutSec=1
 
 [Install]
